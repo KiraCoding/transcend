@@ -24,20 +24,25 @@ pub fn base() -> *const usize {
 
         #[cfg(target_os = "linux")]
         {
-            use core::mem::MaybeUninit;
-            use core::ptr::addr_of;
-            use libc::{dladdr, DL_info};
+            use core::mem::zeroed;
+            use libc::{dladdr, getauxval, Dl_info, AT_PHDR };
 
-            static FIND_ME: () = ();
+            let phdr_address = unsafe { getauxval(AT_PHDR)};
+            let dummy_address = phdr_address as *const usize;
 
-            let mut info: DL_info = unsafe { MaybeUninit::zeroed().assume_init() };
-            unsafe { dladdr(addr_of!(FIND_ME).cast(), &mut info) };
+            let mut info: Dl_info = unsafe { zeroed() };
+
+            unsafe { dladdr(dummy_address.cast(), &mut info) };
 
             Base(info.dli_fbase as *const usize)
         }
     });
 
     BASE.0
+}
+
+fn main() {
+  println!("base address {:p}", base());
 }
 
 /// Calculates the offset from the base address of the calling process (.exe file).
