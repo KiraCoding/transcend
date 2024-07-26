@@ -25,7 +25,7 @@ pub fn base() -> *const usize {
         #[cfg(target_os = "linux")]
         {
             use core::mem::zeroed;
-            use libc::{dladdr, getauxval, Dl_info, AT_PHDR };
+            use libc::{dladdr, getauxval, AT_PHDR, Dl_info};
 
             let phdr_address = unsafe { getauxval(AT_PHDR)};
             let dummy_address = phdr_address as *const usize;
