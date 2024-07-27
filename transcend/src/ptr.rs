@@ -1,8 +1,12 @@
 use std::mem::zeroed;
+use std::slice::from_raw_parts;
 use std::{mem::transmute_copy, sync::LazyLock};
 use windows::Win32::Foundation::HMODULE;
 use windows::Win32::System::ProcessStatus::{GetModuleInformation, MODULEINFO};
 use windows::Win32::System::Threading::GetCurrentProcess;
+
+#[cfg(feature = "macros")]
+pub use transcend_macros::sig;
 
 // TODO: document
 // Get the base of the current process
@@ -54,7 +58,6 @@ pub fn size() -> usize {
     {
         let process = unsafe { GetCurrentProcess() };
         let module = HMODULE(base() as *mut _);
-
         let mut info = unsafe { zeroed() };
 
         unsafe {
@@ -65,7 +68,21 @@ pub fn size() -> usize {
     }
 }
 
-pub fn scan() {}
+// Find first occurance of a byte pattern and returns it's start address
+pub fn scan(pattern: &[u8]) -> Option<*const usize> {
+    let base = base();
+    let slice = unsafe { from_raw_parts(base as *const u8, size()) };
+
+    slice
+        .windows(pattern.len())
+        .position(|window| {
+            pattern
+                .iter()
+                .enumerate()
+                .all(|(i, &p)| p == 0xFF || window[i] == p)
+        })
+        .map(|offset| unsafe { base.add(offset) })
+}
 
 /// Calculates the offset from the base address of the calling process (.exe file).
 ///

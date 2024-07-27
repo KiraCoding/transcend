@@ -42,7 +42,16 @@ name = "transcend"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "transcend_macros",
  "windows",
+]
+
+[[package]]
+name = "transcend_macros"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]

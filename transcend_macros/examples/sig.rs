@@ -1,0 +1,10 @@
+use transcend_macros::sig;
+
+fn main() {
+    let sig = sig![55 48 89 E5 66 B8 ?? ?? 48 8B 5D FC];
+
+    assert_eq!(
+        &[0x55, 0x48, 0x89, 0xE5, 0x66, 0xB8, 0xFF, 0xFF, 0x48, 0x8B, 0x5D, 0xFC],
+        sig
+    )
+}
