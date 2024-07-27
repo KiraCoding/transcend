@@ -5,7 +5,7 @@ use windows::Win32::System::ProcessStatus::{GetModuleInformation, MODULEINFO};
 use windows::Win32::System::Threading::GetCurrentProcess;
 
 // TODO: document
-// Get the size of the current process
+// Get the base of the current process
 #[must_use]
 #[inline(always)]
 pub fn base() -> *const usize {
@@ -50,14 +50,22 @@ pub fn base() -> *const usize {
 // Get the size of the current process
 #[must_use]
 pub fn size() -> usize {
-    let process = unsafe { GetCurrentProcess() };
-    let module = HMODULE(base() as *mut _);
+    #[cfg(target_os = "windows")]
+    {
+        let process = unsafe { GetCurrentProcess() };
+        let module = HMODULE(base() as *mut _);
 
-    let mut info = unsafe { zeroed() };
+        let mut info = unsafe { zeroed() };
 
-    unsafe { GetModuleInformation(process, module, &mut info, size_of::<MODULEINFO>() as u32).unwrap() };
-    info.SizeOfImage as usize
+        unsafe {
+            GetModuleInformation(process, module, &mut info, size_of::<MODULEINFO>() as u32)
+                .unwrap()
+        };
+        info.SizeOfImage as usize
+    }
 }
+
+pub fn scan() {}
 
 /// Calculates the offset from the base address of the calling process (.exe file).
 ///
