@@ -50,10 +50,8 @@ pub fn base() -> *const usize {
 // Get the size of the current process
 #[must_use]
 pub fn size() -> usize {
-    let base = base() as *mut _;
-
     let process = unsafe { GetCurrentProcess() };
-    let module = HMODULE(base);
+    let module = HMODULE(base() as *mut _);
 
     let mut info = unsafe { zeroed() };
 
