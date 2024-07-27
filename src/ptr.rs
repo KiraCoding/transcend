@@ -41,10 +41,6 @@ pub fn base() -> *const usize {
     BASE.0
 }
 
-fn main() {
-    println!("Base address {:p}", base());
-}
-
 /// Calculates the offset from the base address of the calling process (.exe file).
 ///
 /// # Safety
