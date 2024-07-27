@@ -1,6 +1,8 @@
 use std::mem::zeroed;
 use std::slice::from_raw_parts;
 use std::{mem::transmute_copy, sync::LazyLock};
+use rayon::iter::IndexedParallelIterator;
+use rayon::slice::ParallelSlice;
 use windows::Win32::Foundation::HMODULE;
 use windows::Win32::System::ProcessStatus::{GetModuleInformation, MODULEINFO};
 use windows::Win32::System::Threading::GetCurrentProcess;
@@ -74,8 +76,8 @@ pub fn scan(pattern: &[u8]) -> Option<*const usize> {
     let slice = unsafe { from_raw_parts(base as *const u8, size()) };
 
     slice
-        .windows(pattern.len())
-        .position(|window| {
+        .par_windows(pattern.len())
+        .position_first(|window| {
             pattern
                 .iter()
                 .enumerate()
