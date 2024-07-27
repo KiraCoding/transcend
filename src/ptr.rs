@@ -55,10 +55,10 @@ pub fn size() -> usize {
     let process = unsafe { GetCurrentProcess() };
     let module = HMODULE(base);
 
-    let info = unsafe { zeroed() };
+    let mut info = unsafe { zeroed() };
 
-    unsafe { GetModuleInformation(process, module, info, size_of::<MODULEINFO>() as u32).unwrap() };
-    unsafe { (*info).SizeOfImage as usize }
+    unsafe { GetModuleInformation(process, module, &mut info, size_of::<MODULEINFO>() as u32).unwrap() };
+    info.SizeOfImage as usize
 }
 
 /// Calculates the offset from the base address of the calling process (.exe file).
