@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+rayon = "1.10.0"
 transcend_macros = { version = "0.1.0", optional = true, path = "../transcend_macros" }
 
 [target.'cfg(windows)'.dependencies]
