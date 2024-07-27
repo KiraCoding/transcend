@@ -1,7 +1,8 @@
 use std::mem::zeroed;
 use std::{mem::transmute_copy, sync::LazyLock};
-use windows::Win32::Foundation::{HANDLE, HMODULE};
+use windows::Win32::Foundation::HMODULE;
 use windows::Win32::System::ProcessStatus::{GetModuleInformation, MODULEINFO};
+use windows::Win32::System::Threading::GetCurrentProcess;
 
 // TODO: document
 // Get the size of the current process
@@ -51,7 +52,7 @@ pub fn base() -> *const usize {
 pub fn size() -> usize {
     let base = base() as *mut _;
 
-    let process = HANDLE(base);
+    let process = unsafe { GetCurrentProcess() };
     let module = HMODULE(base);
 
     let info = unsafe { zeroed() };
