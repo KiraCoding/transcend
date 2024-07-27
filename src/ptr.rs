@@ -1,6 +1,10 @@
+use std::mem::zeroed;
 use std::{mem::transmute_copy, sync::LazyLock};
+use windows::Win32::Foundation::{HANDLE, HMODULE};
+use windows::Win32::System::ProcessStatus::{GetModuleInformation, MODULEINFO};
 
 // TODO: document
+// Get the size of the current process
 #[must_use]
 #[inline(always)]
 pub fn base() -> *const usize {
@@ -39,6 +43,21 @@ pub fn base() -> *const usize {
     });
 
     BASE.0
+}
+
+// TODO: document
+// Get the size of the current process
+#[must_use]
+pub fn size() -> usize {
+    let base = base() as *mut _;
+
+    let process = HANDLE(base);
+    let module = HMODULE(base);
+
+    let info = unsafe { zeroed() };
+
+    unsafe { GetModuleInformation(process, module, info, size_of::<MODULEINFO>() as u32).unwrap() };
+    unsafe { (*info).SizeOfImage as usize }
 }
 
 /// Calculates the offset from the base address of the calling process (.exe file).
