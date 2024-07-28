@@ -89,6 +89,7 @@ pub fn scan(pattern: &[u8]) -> Option<*const usize> {
         .map(|offset| unsafe { base.add(offset) })
 }
 
+#[derive(Debug)]
 pub struct Section {
     pub name: String,
     pub base: *const usize,
