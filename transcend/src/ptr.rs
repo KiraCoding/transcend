@@ -1,10 +1,13 @@
+use rayon::iter::IndexedParallelIterator;
+use rayon::slice::ParallelSlice;
+use std::ffi::CStr;
 use std::mem::zeroed;
 use std::slice::from_raw_parts;
 use std::{mem::transmute_copy, sync::LazyLock};
-use rayon::iter::IndexedParallelIterator;
-use rayon::slice::ParallelSlice;
 use windows::Win32::Foundation::HMODULE;
+use windows::Win32::System::Diagnostics::Debug::{IMAGE_NT_HEADERS64, IMAGE_SECTION_HEADER};
 use windows::Win32::System::ProcessStatus::{GetModuleInformation, MODULEINFO};
+use windows::Win32::System::SystemServices::IMAGE_DOS_HEADER;
 use windows::Win32::System::Threading::GetCurrentProcess;
 
 #[cfg(feature = "macros")]
@@ -84,6 +87,53 @@ pub fn scan(pattern: &[u8]) -> Option<*const usize> {
                 .all(|(i, &p)| p == 0xFF || window[i] == p)
         })
         .map(|offset| unsafe { base.add(offset) })
+}
+
+pub struct Section {
+    pub name: String,
+    pub base: *const usize,
+    pub size: usize,
+}
+
+pub fn sections() -> Vec<Section> {
+    let base = base();
+
+    let dos_header = unsafe { &*(base as *const IMAGE_DOS_HEADER) };
+    if dos_header.e_magic != 0x5A4D {
+        println!("Invalid DOS signature.");
+        return Vec::new();
+    }
+
+    let nt_headers =
+        unsafe { &*((base as usize + dos_header.e_lfanew as usize) as *const IMAGE_NT_HEADERS64) };
+    if nt_headers.Signature != 0x00004550 {
+        println!("Invalid NT signature.");
+        return Vec::new();
+    }
+
+    let section_header_ptr =
+        (base as usize + dos_header.e_lfanew as usize + size_of::<IMAGE_NT_HEADERS64>())
+            as *const IMAGE_SECTION_HEADER;
+
+    let mut sections = Vec::new();
+    let number_of_sections = nt_headers.FileHeader.NumberOfSections;
+
+    for i in 0..number_of_sections {
+        let section = unsafe { &*section_header_ptr.offset(i as isize) };
+        let name = unsafe {
+            CStr::from_ptr(section.Name.as_ptr() as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        };
+
+        sections.push(Section {
+            name,
+            base: unsafe { base.offset(section.VirtualAddress as isize) },
+            size: unsafe { section.Misc.VirtualSize as usize },
+        });
+    }
+
+    sections
 }
 
 /// Calculates the offset from the base address of the calling process (.exe file).
