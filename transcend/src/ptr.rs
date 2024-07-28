@@ -89,11 +89,29 @@ pub fn scan(pattern: &[u8]) -> Option<*const usize> {
         .map(|offset| unsafe { base.add(offset) })
 }
 
+pub fn scan_slice(slice: &[u8], pattern: &[u8]) -> Option<*const usize> {
+    slice
+        .par_windows(pattern.len())
+        .position_first(|window| {
+            pattern
+                .iter()
+                .enumerate()
+                .all(|(i, &p)| p == 0xFF || window[i] == p)
+        })
+        .map(|offset| unsafe { slice.as_ptr().add(offset) as *const _ })
+}
+
 #[derive(Debug)]
 pub struct Section {
     pub name: String,
     pub base: *const usize,
-    pub size: usize,
+    pub len: usize,
+}
+
+impl Section {
+    pub fn as_slice(&self) -> &[u8] {
+        unsafe { from_raw_parts(self.base as *const _, self.len) }
+    }
 }
 
 pub fn sections() -> Vec<Section> {
@@ -122,7 +140,7 @@ pub fn sections() -> Vec<Section> {
         sections.push(Section {
             name,
             base: unsafe { base.offset(section.VirtualAddress as isize) },
-            size: unsafe { section.Misc.VirtualSize as usize },
+            len: unsafe { section.Misc.VirtualSize as usize },
         });
     }
 
