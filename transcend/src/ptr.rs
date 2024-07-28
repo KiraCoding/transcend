@@ -73,23 +73,12 @@ pub fn size() -> usize {
     }
 }
 
-// Find first occurance of a byte pattern and returns it's start address
-pub fn scan(pattern: &[u8]) -> Option<*const usize> {
-    let base = base();
-    let slice = unsafe { from_raw_parts(base as *const u8, size()) };
-
-    slice
-        .par_windows(pattern.len())
-        .position_first(|window| {
-            pattern
-                .iter()
-                .enumerate()
-                .all(|(i, &p)| p == 0xFF || window[i] == p)
-        })
-        .map(|offset| unsafe { base.add(offset) })
+#[must_use]
+pub fn program() -> &'static [u8] {
+    unsafe { from_raw_parts(base() as *const _, size()) }
 }
 
-pub fn scan_slice(slice: &[u8], pattern: &[u8]) -> Option<*const usize> {
+pub fn scan(slice: &[u8], pattern: &[u8]) -> Option<*const usize> {
     slice
         .par_windows(pattern.len())
         .position_first(|window| {
