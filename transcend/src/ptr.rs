@@ -114,24 +114,25 @@ pub fn sections() -> Vec<Section> {
         (base as usize + dos_header.e_lfanew as usize + size_of::<IMAGE_NT_HEADERS64>())
             as *const IMAGE_SECTION_HEADER;
 
+    let mut sections = Vec::new();
     let number_of_sections = nt_headers.FileHeader.NumberOfSections;
 
-    (0..number_of_sections)
-        .map(|index| unsafe { &*section_header_ptr.offset(index as isize) })
-        .map(|section| {
-            let name = unsafe {
-                CStr::from_ptr(section.Name.as_ptr() as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-            };
+    for i in 0..number_of_sections {
+        let section = unsafe { &*section_header_ptr.offset(i as isize) };
+        let name = unsafe {
+            CStr::from_ptr(section.Name.as_ptr() as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        };
 
-            Section {
-                name,
-                base: unsafe { base.offset(section.VirtualAddress as isize) },
-                len: unsafe { section.Misc.VirtualSize as usize },
-            }
-        })
-        .collect()
+        sections.push(Section {
+            name,
+            base: unsafe { base.offset(section.VirtualAddress as isize) },
+            len: unsafe { section.Misc.VirtualSize as usize },
+        });
+    }
+
+    sections
 }
 
 /// Calculates the offset from the base address of the calling process (.exe file).
