@@ -114,9 +114,7 @@ pub fn sections() -> Vec<Section> {
         (base as usize + dos_header.e_lfanew as usize + size_of::<IMAGE_NT_HEADERS64>())
             as *const IMAGE_SECTION_HEADER;
 
-    let number_of_sections = nt_headers.FileHeader.NumberOfSections;
-
-    (0..number_of_sections)
+    (0..nt_headers.FileHeader.NumberOfSections)
         .map(|index| unsafe { &*section_header_ptr.add(index as usize) })
         .map(|section| {
             let name = unsafe {
