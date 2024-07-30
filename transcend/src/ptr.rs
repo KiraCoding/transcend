@@ -107,9 +107,8 @@ pub fn sections() -> Vec<Section> {
     let base = base();
 
     let dos_header = unsafe { &*(base as *const IMAGE_DOS_HEADER) };
-
     let nt_headers =
-        unsafe { &*((base as usize + dos_header.e_lfanew as usize) as *const IMAGE_NT_HEADERS64) };
+        unsafe { &*((base.add(dos_header.e_lfanew as usize)) as *const IMAGE_NT_HEADERS64) };
 
     let section_header_ptr =
         (base as usize + dos_header.e_lfanew as usize + size_of::<IMAGE_NT_HEADERS64>())
