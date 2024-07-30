@@ -117,7 +117,7 @@ pub fn sections() -> Vec<Section> {
     let number_of_sections = nt_headers.FileHeader.NumberOfSections;
 
     (0..number_of_sections)
-        .map(|index| unsafe { &*section_header_ptr.add(index as usize) })
+        .map(|index| unsafe { &*section_header_ptr.offset(index as isize) })
         .map(|section| {
             let name = unsafe {
                 CStr::from_ptr(section.Name.as_ptr() as *const i8)
