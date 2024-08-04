@@ -1,11 +1,16 @@
 use rayon::iter::IndexedParallelIterator;
 use rayon::slice::ParallelSlice;
+use std::arch::asm;
 use std::ffi::CStr;
 use std::mem::zeroed;
+use std::ptr::copy_nonoverlapping;
 use std::slice::from_raw_parts;
 use std::{mem::transmute_copy, sync::LazyLock};
 use windows::Win32::Foundation::HMODULE;
 use windows::Win32::System::Diagnostics::Debug::{IMAGE_NT_HEADERS64, IMAGE_SECTION_HEADER};
+use windows::Win32::System::Memory::{
+    VirtualAlloc, VirtualProtect, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE,
+};
 use windows::Win32::System::ProcessStatus::{GetModuleInformation, MODULEINFO};
 use windows::Win32::System::SystemServices::IMAGE_DOS_HEADER;
 use windows::Win32::System::Threading::GetCurrentProcess;
@@ -50,6 +55,11 @@ pub fn base() -> *const usize {
 
             Base(address)
         }
+
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+        {
+            unimplemented!()
+        }
     });
 
     BASE.0
@@ -71,6 +81,11 @@ pub fn size() -> usize {
         };
         info.SizeOfImage as usize
     }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        unimplemented!()
+    }
 }
 
 #[must_use]
@@ -88,6 +103,80 @@ pub fn scan(slice: &[u8], pattern: &[u8]) -> Option<*const usize> {
                 .all(|(i, &p)| p == 0xFF || window[i] == p)
         })
         .map(|offset| unsafe { slice.as_ptr().add(offset) as *const _ })
+}
+
+// x64 windows hook with trampoline using naked ASM
+pub fn hook<A>(target: *const usize, function: impl Fn(A)) {
+    let original_bytes = unsafe { from_raw_parts(target, 14) };
+    let original_size = 14;
+
+    let func = &function as *const _ as *const usize;
+
+    let mut old_protection = windows::Win32::System::Memory::PAGE_PROTECTION_FLAGS(0);
+    unsafe {
+        VirtualProtect(
+            target as *mut _,
+            original_size,
+            PAGE_EXECUTE_READWRITE,
+            &mut old_protection,
+        )
+        .unwrap();
+    }
+
+    let trampoline = unsafe {
+        VirtualAlloc(None, 5, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE) as *mut usize
+    };
+
+    unsafe { copy_nonoverlapping(target, trampoline, original_bytes.len()) };
+
+    let return_address = unsafe { target.add(original_bytes.len()) };
+    let trampoline_jump = unsafe { trampoline.add(original_bytes.len()) };
+
+    // Create a far jump back to the original code (after our hook)
+    let jump_back = [
+        0xFF, 0x25, // jmp [rip+offset]
+        0x00, 0x00, 0x00, 0x00, // offset placeholder (rip-relative offset to address)
+        0x00, 0x00, 0x00, 0x00, // address placeholder (64-bit address to jump to)
+    ];
+
+    unsafe { copy_nonoverlapping(jump_back.as_ptr(), trampoline_jump, jump_back.len()) };
+
+    let return_addr_location = unsafe { trampoline_jump.add(6) } as *mut *const usize;
+    unsafe { *return_addr_location = return_address };
+
+    // Now overwrite the target function with a jump to the hook function
+    let jump_instructions = [
+        0x48, 0xB8, // mov rax, <64-bit address>
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Placeholder for the address
+        0xFF, 0xE0, // jmp rax
+    ];
+
+    unsafe {
+        copy_nonoverlapping(
+            jump_instructions.as_ptr(),
+            target as *mut usize,
+            jump_instructions.len(),
+        )
+    };
+
+    // Write the actual 64-bit address of the hook function
+    let address_location = unsafe { target.add(2) } as *mut usize;
+    unsafe { *address_location = func as usize };
+
+    // Fill any remaining space with NOPs (No Operation instructions)
+    for i in jump_instructions.len()..original_size {
+        unsafe { *target.add(i) = 0x90 }; // NOP instruction
+    }
+
+    // Restore the original memory protection
+    unsafe {
+        VirtualProtect(
+            target as *mut _,
+            original_size,
+            old_protection,
+            &mut old_protection,
+        )
+    };
 }
 
 #[derive(Debug)]
@@ -150,7 +239,7 @@ pub fn sections() -> Vec<Section> {
 /// ```
 #[must_use]
 #[inline(always)]
-pub unsafe fn resolve_fn<F: FnPtr>(offset: usize) -> F {
+pub unsafe fn resolve_rva<F: FnPtr>(offset: usize) -> F {
     // SAFETY: The caller guarantees that `F` is an `unsafe extern "ABI" fn`.
     unsafe { transmute_copy(&base().add(offset)) }
 }
