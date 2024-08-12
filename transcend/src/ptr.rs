@@ -1,6 +1,5 @@
 use rayon::iter::IndexedParallelIterator;
 use rayon::slice::ParallelSlice;
-use std::arch::asm;
 use std::ffi::CStr;
 use std::mem::zeroed;
 use std::ptr::copy_nonoverlapping;
